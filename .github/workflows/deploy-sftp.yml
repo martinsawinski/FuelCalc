@@ -15,7 +15,8 @@ jobs:
           target-server: ${{ secrets.FTP_SERVER }}
           remote-user: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          desination-path: /home/sawinski/mileage.yetirc.com/dev
+          private-ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          desination-path: ${{ secrets.DESTINATION_PATH }}
           source-path: ./dist/                # your build output
           rsync-options: --archive --verbose --compress --delete-after --human-readable
           server-dir: /public_html/app/    # your webroot or subfolder
