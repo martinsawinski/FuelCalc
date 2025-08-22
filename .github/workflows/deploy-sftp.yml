@@ -12,12 +12,9 @@ jobs:
       - name: Sync files (SFTP/SSH via rsync)
         uses: SamKirkland/web-deploy@v1
         with:
-          target-server: ${{ secrets.FTP_SERVER }}
-          remote-user: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
+          target-server: ${{ secrets.SSH_HOST }}
+          remote-user:   ${{ secrets.SSH_USER }}
           private-ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          desination-path: ${{ secrets.DESTINATION_PATH }}
-          source-path: ./dist/                # your build output
+          destination-path: /home/sawi0011/mileage.yetirc.com/dev
+          source-path: ./dist/
           rsync-options: --archive --verbose --compress --delete-after --human-readable
-          server-dir: /public_html/app/    # your webroot or subfolder
-          dangerous-clean-slate: true      # wipes server-dir before upload
