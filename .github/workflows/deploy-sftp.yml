@@ -1,4 +1,4 @@
-name: Sync files (SFTP/SSH via rsync)
+- name: Sync files (SFTP/SSH via rsync)
   uses: SamKirkland/web-deploy@v1
   with:
     target-server: your.server.com
@@ -7,4 +7,3 @@ name: Sync files (SFTP/SSH via rsync)
     destination-path: /home/ACCOUNT/public_html/_deploy_test/
     source-path: ./dist/
     rsync-options: --archive --verbose --compress --delete-after --human-readable
-    dangerous-clean-slate: true
