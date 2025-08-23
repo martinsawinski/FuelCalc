@@ -1,4 +1,4 @@
-const CACHE_NAME = "fuel-runtime-calculator-v1.20-timer";
+const CACHE_NAME = "fuel-runtime-calculator-v1.0.1";
 const urlsToCache = [
   "/",
   "/index.html",
