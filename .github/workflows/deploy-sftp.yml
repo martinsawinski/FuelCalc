@@ -13,20 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Upload to host
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: sftp
-          port: ${{ secrets.FTP_PORT || 22 }}
-          local-dir: ./mileage.yetirc.com/
-          server-dir: /home/sawi0011/mileage.yetirc.com/web
-          exclude: |
-            **/.git*
-            .github/**
-            **/node_modules/**
-            **/.DS_Store
-          dangerous-clean-slate: true
+ - name: Sync files (SFTP/SSH via rsync)
+  uses: SamKirkland/web-deploy@v1
+  with:
+    target-server: your.server.com
+    remote-user: ${{ secrets.SSH_USER }}
+    private-ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    destination-path: /home/ACCOUNT/public_html/_deploy_test/
+    source-path: ./dist/
+    rsync-options: --archive --verbose --compress --delete-after --human-readable
+    dangerous-clean-slate: true
