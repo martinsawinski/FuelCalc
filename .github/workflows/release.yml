@@ -11,7 +11,7 @@ on:
         default: 'patch'
 
 permissions:
-  contents: write  # needed for committing, tagging, and creating releases
+  contents: write
 
 jobs:
   release:
@@ -21,78 +21,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # we need tags & history
+          fetch-depth: 0
 
-      - name: Ensure at least one tag exists (bootstrap v1.0.0 if none)
-        id: ensure-tag
+      - name: Determine release type
+        id: releasetype
         run: |
-          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
-            echo "has_tag=true" >> $GITHUB_OUTPUT
-          else
-            git tag v1.0.0
-            echo "has_tag=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Get latest tag
-        id: latest
-        uses: actions-ecosystem/action-get-latest-tag@v1
-        with:
-          semver_only: true
-          initial_version: v1.0.0
-
-      - name: Decide bump type
-        id: bump
-        run: |
-          # From push events, default to patch. From manual dispatch, use provided input.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "release_type=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
+            echo "type=${{ github.event.inputs.release_type }}" >> "$GITHUB_OUTPUT"
           else
-            echo "release_type=patch" >> $GITHUB_OUTPUT
+            echo "type=patch" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Get latest tag (or bootstrap)
+        id: latest
+        run: |
+          set -e
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            LATEST_TAG="$(git describe --tags --abbrev=0)"
+          else
+            # If no tag exists yet, treat current as v1.0.0 (pre-bump state)
+            LATEST_TAG="v1.0.0"
+          fi
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Bump semver
-        id: bumped
-        uses: actions-ecosystem/action-bump-semver@v1
-        with:
-          current_version: ${{ steps.latest.outputs.tag }}
-          level: ${{ steps.bump.outputs.release_type }}
-
-      - name: Set VERSION
-        id: setver
+        id: bump
         run: |
-          CLEAN="${{ steps.bumped.outputs.new_version }}"
-          CLEAN="${CLEAN#v}"  # drop leading v
-          echo "VERSION=$CLEAN" >> $GITHUB_OUTPUT
+          old="${{ steps.latest.outputs.tag }}"
+          old="${old#v}"   # strip leading v
+          IFS='.' read -r MAJOR MINOR PATCH <<EOF
+          $old
+          EOF
+          case "${{ steps.releasetype.outputs.type }}" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch|*) PATCH=$((PATCH+1)) ;;
+          esac
+          new="$MAJOR.$MINOR.$PATCH"
+          echo "version=$new" >> "$GITHUB_OUTPUT"
+          echo "vnew=v$new"   >> "$GITHUB_OUTPUT"
 
-      - name: Show version
-        run: |
-          echo "Old: ${{ steps.latest.outputs.tag }}"
-          echo "New: v${{ steps.setver.outputs.VERSION }}"
-
-      # ---- Update PWA version strings ----
       - name: Update service worker cache name
         run: |
-          VERSION="${{ steps.setver.outputs.VERSION }}"
+          VERSION="${{ steps.bump.outputs.version }}"
           if [ -f service-worker.js ]; then
-            # Replace: const CACHE_NAME = "fuel-runtime-calculator-v....";
             sed -i -E 's/(const[[:space:]]+CACHE_NAME[[:space:]]*=[[:space:]]*")[^"]+(")/\1fuel-runtime-calculator-v'"$VERSION"'\2/' service-worker.js
           fi
 
-      - name: Update index.html cache-busting query params
+      - name: Update cache-busting query strings in index.html
         run: |
-          VERSION="${{ steps.setver.outputs.VERSION }}"
+          VERSION="${{ steps.bump.outputs.version }}"
           if [ -f index.html ]; then
-            # Replace v=... on style.css and script.js includes
             sed -i -E 's|(style\.css\?v=)[^"]+|\1'"$VERSION"'|g' index.html
             sed -i -E 's|(script\.js\?v=)[^"]+|\1'"$VERSION"'|g' index.html
           fi
 
-      - name: Commit version bump
+      - name: Commit version bump (if any changes)
         run: |
-          VERSION="${{ steps.setver.outputs.VERSION }}"
+          VERSION="${{ steps.bump.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Only commit if there are changes
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "chore: bump PWA version to v${VERSION}"
@@ -101,26 +89,23 @@ jobs:
             echo "No changes to commit."
           fi
 
-      - name: Create tag vX.Y.Z
+      - name: Create tag
         run: |
-          VERSION="${{ steps.setver.outputs.VERSION }}"
-          git tag "v${VERSION}"
-          git push origin "v${VERSION}"
+          VNEW="${{ steps.bump.outputs.vnew }}"
+          git tag "$VNEW"
+          git push origin "$VNEW"
 
-      # Optional: build/zip the repository contents for release
-      - name: Generate release zip
+      - name: Create release zip
         run: |
-          VERSION="${{ steps.setver.outputs.VERSION }}"
+          VERSION="${{ steps.bump.outputs.version }}"
           ZIP="fuel-runtime-v${VERSION}.zip"
-          # Exclude .git folder and workflow artifacts
           zip -r "$ZIP" . -x "*.git*" ".github/workflows/*"
-          echo "ZIP_NAME=$ZIP" >> $GITHUB_ENV
+          echo "ZIP_NAME=$ZIP" >> "$GITHUB_ENV"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.setver.outputs.VERSION }}
-          name: v${{ steps.setver.outputs.VERSION }}
+          tag_name: ${{ steps.bump.outputs.vnew }}
+          name: ${{ steps.bump.outputs.vnew }}
           generate_release_notes: true
-          files: |
-            ${{ env.ZIP_NAME }}
+          files: ${{ env.ZIP_NAME }}
