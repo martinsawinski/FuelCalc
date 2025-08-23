@@ -1,3 +1,14 @@
+name: Validate SSH key
+  shell: bash
+  run: |
+    install -m 700 -d ~/.ssh
+    # write secret as-is, convert CRLF -> LF, lock perms
+    printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | sed -e 's/\r$//' > ~/.ssh/dh_key
+    chmod 600 ~/.ssh/dh_key
+    # will fail if the key is corrupt
+    ssh-keygen -lf ~/.ssh/dh_key
+    ssh-keyscan -H vps49852.dreamhostps.com >> ~/.ssh/known_hosts
+
 name: Deploy via SFTP
 on:
   push:
