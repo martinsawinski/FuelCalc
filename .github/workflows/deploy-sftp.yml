@@ -11,16 +11,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload via SFTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Upload via SFTP (password)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
         with:
           server: ${{ secrets.FTP_SERVER }}     # e.g. sftp.dreamhost.com
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: sftp
           port: 22
-          local-dir: ./
-          server-dir: /home/sawi0011/mileage.yetirc.com/
+          local-path: ./
+          remote_path: /home/sawi0011/mileage.yetirc.com/
+          sftp_only: true
           exclude: |
             **/.git*
             .github/**
