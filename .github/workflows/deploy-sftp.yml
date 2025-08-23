@@ -1,11 +1,32 @@
-- name: Validate SSH key
-  shell: bash
-  run: |
-    install -m 700 -d ~/.ssh
-    # write secret as-is, convert CRLF -> LF, lock perms
-    printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | sed -e 's/\r$//' > ~/.ssh/dh_key
-    chmod 600 ~/.ssh/dh_key
-    # will fail if the key is corrupt
-    ssh-keygen -lf ~/.ssh/dh_key
-    ssh-keyscan -H vps49852.dreamhostps.com >> ~/.ssh/known_hosts
-    
+# .github/workflows/deploy-sftp.yml
+name: Deploy via SFTP/FTPS
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*'
+      - '!.github/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload to host
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: sftp
+          port: ${{ secrets.FTP_PORT || 22 }}
+          local-dir: ./mileage.yetirc.com/
+          server-dir: /home/sawi0011/mileage.yetirc.com/web
+          exclude: |
+            **/.git*
+            .github/**
+            **/node_modules/**
+            **/.DS_Store
+          dangerous-clean-slate: true
