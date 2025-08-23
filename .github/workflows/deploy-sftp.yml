@@ -8,24 +8,4 @@
     # will fail if the key is corrupt
     ssh-keygen -lf ~/.ssh/dh_key
     ssh-keyscan -H vps49852.dreamhostps.com >> ~/.ssh/known_hosts
-
-- name: Deploy via SFTP
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Sync files (SFTP/SSH via rsync)
-        uses: SamKirkland/web-deploy@v1
-        with:
-          target-server: ${{ secrets.SSH_HOST }}
-          remote-user:   ${{ secrets.SSH_USER }}
-          private-ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          destination-path: /home/sawi0011/mileage.yetirc.com/dev
-          source-path: ./dist/
-          rsync-options: --archive --verbose --compress --delete-after --human-readable
+    
