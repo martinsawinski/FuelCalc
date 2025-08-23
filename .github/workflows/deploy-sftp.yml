@@ -1,4 +1,4 @@
-name: Validate SSH key
+- name: Validate SSH key
   shell: bash
   run: |
     install -m 700 -d ~/.ssh
@@ -9,7 +9,7 @@ name: Validate SSH key
     ssh-keygen -lf ~/.ssh/dh_key
     ssh-keyscan -H vps49852.dreamhostps.com >> ~/.ssh/known_hosts
 
-name: Deploy via SFTP
+- name: Deploy via SFTP
 on:
   push:
     branches: [ main ]
