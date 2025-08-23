@@ -1,19 +1,4 @@
-# .github/workflows/deploy-sftp.yml
-name: Deploy via SFTP/FTPS
-on:
-  push:
-    branches: [ main ]
-    paths:
-      - '**/*'
-      - '!.github/**'
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
- - name: Sync files (SFTP/SSH via rsync)
+name: Sync files (SFTP/SSH via rsync)
   uses: SamKirkland/web-deploy@v1
   with:
     target-server: your.server.com
