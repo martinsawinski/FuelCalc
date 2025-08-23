@@ -26,4 +26,3 @@ jobs:
             .github/**
             **/.DS_Store
             **/node_modules/**
-          dangerous-clean-slate: true
