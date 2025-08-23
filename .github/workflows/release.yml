@@ -1,0 +1,126 @@
+name: Release & PWA Version Bump
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Semver bump: patch | minor | major'
+        required: true
+        default: 'patch'
+
+permissions:
+  contents: write  # needed for committing, tagging, and creating releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # we need tags & history
+
+      - name: Ensure at least one tag exists (bootstrap v1.0.0 if none)
+        id: ensure-tag
+        run: |
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            echo "has_tag=true" >> $GITHUB_OUTPUT
+          else
+            git tag v1.0.0
+            echo "has_tag=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get latest tag
+        id: latest
+        uses: actions-ecosystem/action-get-latest-tag@v1
+        with:
+          semver_only: true
+          initial_version: v1.0.0
+
+      - name: Decide bump type
+        id: bump
+        run: |
+          # From push events, default to patch. From manual dispatch, use provided input.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "release_type=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
+          else
+            echo "release_type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump semver
+        id: bumped
+        uses: actions-ecosystem/action-bump-semver@v1
+        with:
+          current_version: ${{ steps.latest.outputs.tag }}
+          level: ${{ steps.bump.outputs.release_type }}
+
+      - name: Set VERSION
+        id: setver
+        run: |
+          CLEAN="${{ steps.bumped.outputs.new_version }}"
+          CLEAN="${CLEAN#v}"  # drop leading v
+          echo "VERSION=$CLEAN" >> $GITHUB_OUTPUT
+
+      - name: Show version
+        run: |
+          echo "Old: ${{ steps.latest.outputs.tag }}"
+          echo "New: v${{ steps.setver.outputs.VERSION }}"
+
+      # ---- Update PWA version strings ----
+      - name: Update service worker cache name
+        run: |
+          VERSION="${{ steps.setver.outputs.VERSION }}"
+          if [ -f service-worker.js ]; then
+            # Replace: const CACHE_NAME = "fuel-runtime-calculator-v....";
+            sed -i -E 's/(const[[:space:]]+CACHE_NAME[[:space:]]*=[[:space:]]*")[^"]+(")/\1fuel-runtime-calculator-v'"$VERSION"'\2/' service-worker.js
+          fi
+
+      - name: Update index.html cache-busting query params
+        run: |
+          VERSION="${{ steps.setver.outputs.VERSION }}"
+          if [ -f index.html ]; then
+            # Replace v=... on style.css and script.js includes
+            sed -i -E 's|(style\.css\?v=)[^"]+|\1'"$VERSION"'|g' index.html
+            sed -i -E 's|(script\.js\?v=)[^"]+|\1'"$VERSION"'|g' index.html
+          fi
+
+      - name: Commit version bump
+        run: |
+          VERSION="${{ steps.setver.outputs.VERSION }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only commit if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore: bump PWA version to v${VERSION}"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Create tag vX.Y.Z
+        run: |
+          VERSION="${{ steps.setver.outputs.VERSION }}"
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      # Optional: build/zip the repository contents for release
+      - name: Generate release zip
+        run: |
+          VERSION="${{ steps.setver.outputs.VERSION }}"
+          ZIP="fuel-runtime-v${VERSION}.zip"
+          # Exclude .git folder and workflow artifacts
+          zip -r "$ZIP" . -x "*.git*" ".github/workflows/*"
+          echo "ZIP_NAME=$ZIP" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.setver.outputs.VERSION }}
+          name: v${{ steps.setver.outputs.VERSION }}
+          generate_release_notes: true
+          files: |
+            ${{ env.ZIP_NAME }}
